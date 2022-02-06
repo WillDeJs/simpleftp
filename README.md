@@ -24,7 +24,7 @@ Non-secure only implement basic functionality.
 - [ ] REST
 - [x] RNFR
 - [x] RNTO
-- [] ABOR
+- [ ] ABOR
 - [x] DELE
 - [ ] RMD
 - [ ] MKD

@@ -1,3 +1,4 @@
+use std::io::ErrorKind;
 #[allow(dead_code)]
 pub mod client;
 
@@ -9,8 +10,41 @@ pub enum FtpError {
     CommandError(String),
     ResponseError(String),
 }
+impl From<std::io::Error> for FtpError {
+    fn from(error: std::io::Error) -> Self {
+        match error.kind() {
+            ErrorKind::NotFound => Self::FileError("IO resource not found".into()),
+            ErrorKind::PermissionDenied => Self::FileError("IO resource permissions denied".into()),
+            ErrorKind::ConnectionRefused
+            | ErrorKind::ConnectionReset
+            | ErrorKind::ConnectionAborted
+            | ErrorKind::NotConnected => {
+                Self::ConnectionError("IO resource connection failed".into())
+            }
+            ErrorKind::TimedOut => Self::ConnectionError("connection timed out".into()),
+            _ => Self::FileError("Error accessing file/reader/writer".into()),
+        }
+    }
+}
+
+impl std::fmt::Display for FtpError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FtpError::LoginError(error) => write!(f, "Login Error {}", error),
+            FtpError::ConnectionError(error) => write!(f, "Connection ERror: {}", error),
+            FtpError::FileError(error) => write!(f, "File Error: {}", error),
+            FtpError::CommandError(error) => write!(f, "Command Error: {}", error),
+            FtpError::ResponseError(error) => write!(f, "Response Error: {}", error),
+        }
+    }
+}
 pub type Result<T> = std::result::Result<T, FtpError>;
 
+#[allow(dead_code)]
+pub(crate) struct Response {
+    code: usize,
+    message: String,
+}
 #[allow(dead_code)]
 pub(crate) mod status {
 
@@ -26,7 +60,7 @@ pub(crate) mod status {
     pub const NAME_SYSTEM: usize = 215;
 
     // Command related messages
-    pub const COMMAND_OK_: usize = 200;
+    pub const COMMAND_OK: usize = 200;
     pub const COMMAND_NOT_IMPLEMENTED: usize = 202;
     pub const UNKNOWN_COMMAND: usize = 500;
     pub const COMMAND_UNIMPLEMENTED: usize = 502;
@@ -58,7 +92,7 @@ pub(crate) mod status {
     pub const FILE_OK: usize = 150;
     pub const FILE_ACTION_OK: usize = 250;
     pub const PATH_CREATED: usize = 257;
-    pub const FILE_ACTION_ENDING: usize = 350;
+    pub const FILE_ACTION_PENDING: usize = 350;
     pub const FILE_ACTION_NOT_TAKEN: usize = 450;
     pub const LOCAL_ERROR: usize = 451;
     pub const PARAMETER_ERROR: usize = 501;
