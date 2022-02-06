@@ -31,7 +31,7 @@ impl std::fmt::Display for FtpError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             FtpError::LoginError(error) => write!(f, "Login Error {}", error),
-            FtpError::ConnectionError(error) => write!(f, "Connection ERror: {}", error),
+            FtpError::ConnectionError(error) => write!(f, "Connection Error: {}", error),
             FtpError::FileError(error) => write!(f, "File Error: {}", error),
             FtpError::CommandError(error) => write!(f, "Command Error: {}", error),
             FtpError::ResponseError(error) => write!(f, "Response Error: {}", error),

@@ -4,6 +4,7 @@ use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
 use std::io::Write;
+use std::net::Shutdown;
 use std::net::TcpStream;
 use std::net::ToSocketAddrs;
 
@@ -84,10 +85,10 @@ impl FtpClient {
     /// `command`     text command to be sent to server
     /// # Errors
     /// Errors when failing to write to server or to parse a response.
-    fn write_cmd(&mut self, command: String) -> Result<Response> {
+    fn write_cmd(&mut self, command: impl AsRef<str>) -> Result<Response> {
         self.reader
             .get_mut()
-            .write_all(format!("{}\r\n", command).as_bytes())?;
+            .write_all(format!("{}\r\n", command.as_ref()).as_bytes())?;
         self.parse_response()
     }
 
@@ -117,7 +118,7 @@ impl FtpClient {
     ///     client.login("user", "passowrd")?;
     ///
     ///     let mut source = std::fs::File::open("log.txt").expect("Opening file");
-    ///     client.put("/home/will/code/log.txt".into(), &mut source)?;
+    ///     client.get("/home/will/code/log.txt".into(), &mut source)?;
     ///     client.logout()?;
     ///     Ok(())
     /// }
@@ -180,6 +181,9 @@ impl FtpClient {
 
         #[cfg(feature = "debug")]
         println!("Closing connection");
+
+        // close data connection
+        stream.shutdown(Shutdown::Both)?;
         match self.parse_response()?.code {
             CLOSING_DATA_CONNECTION => Ok(()),
             _ => Err(FtpError::ConnectionError("Error closing connection".into())),
@@ -191,7 +195,7 @@ impl FtpClient {
     /// # Errors
     /// When the connection to server fails or when the server provides invalid response.
     pub fn noop(&mut self) -> Result<()> {
-        match self.write_cmd("NOOP".into())?.code {
+        match self.write_cmd("NOOP")?.code {
             COMMAND_OK => Ok(()),
             _ => Err(FtpError::CommandError("failed command".into())),
         }
@@ -265,7 +269,7 @@ impl FtpClient {
     /// # Errors
     /// If the connection cannot be established or if the server refuses.
     pub fn pasv(&mut self) -> Result<TcpStream> {
-        let response = self.write_cmd("PASV".into())?;
+        let response = self.write_cmd("PASV")?;
         let code = response.code;
         if code != PASSIVE_MODE {
             return Err(FtpError::ResponseError(format!(
@@ -288,7 +292,7 @@ impl FtpClient {
     /// On the strange circumstances the server refuses the logout operation
     /// or does not recognize the command.
     pub fn logout(&mut self) -> Result<()> {
-        match self.write_cmd("QUIT".into())?.code {
+        match self.write_cmd("QUIT")?.code {
             SERVICE_CLOSING => Ok(()),
             other => Err(FtpError::LoginError(format!("Ivalid response {}", other))),
         }
