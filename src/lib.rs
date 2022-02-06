@@ -101,4 +101,5 @@ pub(crate) mod status {
     pub const PAGE_TYPE_UNKNOWN: usize = 551;
     pub const FILE_ACTION_ABORTED: usize = 552;
     pub const FILE_NAME_NOT_ALLOWED: usize = 553;
+    pub const DIRECTORY_ALREADY_EXISTS: usize = 521;
 }

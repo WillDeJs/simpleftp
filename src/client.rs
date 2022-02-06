@@ -19,11 +19,14 @@ impl FtpClient {
     /// `address`     Server address to connect
     ///
     /// # Example
-    /// ```no_compile
+    /// ```no_run
+    /// use simpleftp::Result;
+    /// use simpleftp::client::*;
+    ///
     /// fn main() -> Result<()> {
     ///    let mut client = FtpClient::connect("127.0.0.1:21")?;
     ///    client.login("user", "password")?;
-    ///    client.quit()?;
+    ///    client.logout()?;
     ///
     ///    Ok(())
     ///}
@@ -98,8 +101,8 @@ impl FtpClient {
     ///
     /// # Errors
     /// Errors when fialing to write to server or to parse response.
-    pub fn account(&mut self, account: String) -> Result<()> {
-        match self.write_cmd(format!("ACCT {}", account))?.code {
+    pub fn account(&mut self, account: impl AsRef<str>) -> Result<()> {
+        match self.write_cmd(format!("ACCT {}", account.as_ref()))?.code {
             LOGGED_IN => Ok(()),
             _ => Err(FtpError::LoginError("Invalid account information".into())),
         }
@@ -112,13 +115,15 @@ impl FtpClient {
     /// `dest`    Writer destination to dump data setn from server
     ///
     /// # Examples
-    /// ```no_compile
+    /// ```no_run
+    /// use simpleftp::client::*;
+    /// use simpleftp::Result;
     /// fn main() -> Result<()> {
     ///     let mut client = FtpClient::connect("127.0.0.1:21")?;
     ///     client.login("user", "passowrd")?;
     ///
-    ///     let mut source = std::fs::File::open("log.txt").expect("Opening file");
-    ///     client.get("/home/will/code/log.txt".into(), &mut source)?;
+    ///     let mut destination = std::fs::File::open("log.txt").expect("Opening file");
+    ///     client.get("/home/will/code/log.txt".into(), &mut destination)?;
     ///     client.logout()?;
     ///     Ok(())
     /// }
@@ -150,7 +155,7 @@ impl FtpClient {
     /// `source`  Reader stream containing data to send to server
     ///
     /// # Examples
-    /// ```no_compile
+    /// ```no_run
     ///  use simpleftp::client::FtpClient;
     ///  use simpleftp::Result;
     ///
@@ -158,8 +163,8 @@ impl FtpClient {
     ///     let mut client = FtpClient::connect("127.0.0.1:21")?;
     ///     client.login("user", "passowrd/")?;
     ///
-    ///     let mut destination = std::fs::File::create("log.txt").expect("Opening file");
-    ///     client.put("/home/will/code/log.txt".into(), &mut destination)?;
+    ///     let mut source = std::fs::File::create("log.txt").expect("Opening file");
+    ///     client.put("/home/will/code/log.txt", &mut source)?;
     ///     client.logout()?;
     ///     Ok(())
     /// }
@@ -167,9 +172,82 @@ impl FtpClient {
     /// # Errors
     /// Errors when fialing to write to server or to parse response or due to connection problems.
     /// May also fail when reading from the source stream.
-    pub fn put(&mut self, file: String, source: &mut impl Read) -> Result<()> {
+    pub fn put(&mut self, file: impl AsRef<str>, source: &mut impl Read) -> Result<()> {
+        self.store_cmd(file, source, false)?;
+        Ok(())
+    }
+
+    /// Sends a file to the server and stories in a unique location under current directory.
+    ///
+    /// # Arguments
+    /// `file`    Name of the file (includes path) on the server to be retrieved
+    /// `source`  Reader stream containing data to send to server
+    ///
+    ///  # Returns
+    ///  A result string with name of the file created
+    ///
+    /// # Examples
+    /// ```no_run
+    ///  use simpleftp::client::FtpClient;
+    ///  use simpleftp::Result;
+    ///
+    /// fn main() -> Result<()> {
+    ///     let mut client = FtpClient::connect("127.0.0.1:21").unwrap();
+    ///     client.login("user", "passowrd/").unwrap();
+    ///
+    ///     let mut source = std::fs::File::create("log.txt").expect("Opening file");
+    ///     client.put_unique(&mut source).unwrap();
+    ///     client.logout().unwrap();
+    ///     Ok(())
+    /// }
+    /// ```
+    /// # Errors
+    /// Errors when fialing to write to server or to parse response or due to connection problems.
+    /// May also fail when reading from the source stream.
+    pub fn put_unique(&mut self, source: &mut impl Read) -> Result<String> {
+        self.store_cmd("", source, true)
+    }
+
+    /// Sends a file to the server. If file exists, append to it.
+    ///
+    /// # Arguments
+    /// `file`    Name of the file (includes path) on the server to be retrieved
+    /// `source`  Reader stream containing data to send to server
+    ///
+    /// # Examples
+    /// ```no_run
+    ///  use simpleftp::client::FtpClient;
+    ///  use simpleftp::Result;
+    ///
+    /// fn main() -> Result<()> {
+    ///     let mut client = FtpClient::connect("127.0.0.1:21").unwrap();
+    ///     client.login("user", "passowrd/").unwrap();
+    ///
+    ///     let mut source = std::fs::File::create("log.txt").expect("Opening file");
+    ///     client.append(&mut source).unwrap();
+    ///     client.logout().unwrap();
+    ///     Ok(())
+    /// }
+    /// ```
+    /// # Errors
+    /// Errors when fialing to write to server or to parse response or due to connection problems.
+    /// May also fail when reading from the source stream.
+    pub fn append(&mut self, file: impl AsRef<str>, source: &mut impl Read) -> Result<()> {
+        self.store_cmd(file.as_ref(), source, false)?;
+        Ok(())
+    }
+    fn store_cmd(
+        &mut self,
+        file: impl AsRef<str>,
+        source: &mut impl Read,
+        unique: bool,
+    ) -> Result<String> {
         let mut stream = self.pasv()?;
-        let response = self.write_cmd(format!("STOR {}", file))?;
+        let response = if unique {
+            self.write_cmd(format!("STOU {}", file.as_ref()))?
+        } else {
+            self.write_cmd(format!("STOR {}", file.as_ref()))?
+        };
 
         if response.code != FILE_OK {
             return Err(FtpError::CommandError("Could not process file STOR".into()));
@@ -185,7 +263,7 @@ impl FtpClient {
         // close data connection
         stream.shutdown(Shutdown::Both)?;
         match self.parse_response()?.code {
-            CLOSING_DATA_CONNECTION => Ok(()),
+            CLOSING_DATA_CONNECTION => Ok(response.message),
             _ => Err(FtpError::ConnectionError("Error closing connection".into())),
         }
     }
@@ -208,20 +286,24 @@ impl FtpClient {
     ///
     /// # Examples
     /// ```no_run
+    /// # use simpleftp::client;
+    /// # fn main() -> simpleftp::Result<()> {
     /// # use simpleftp::client::FtpClient;
-    /// let mut client = FtpClient::connect("127.0.0.1:21").unwrap();
+    /// let mut client = FtpClient::connect("127.0.0.1:21")?;
     /// client.login("user", "password").unwrap();
     /// client.rename(
-    ///     "/home/will/code/log.txt".into(),
-    ///     "/home/will/code/text.log".into(),
-    /// ).unwrap();
-    /// client.logout().unwrap();
+    ///     "/home/will/code/log.txt",
+    ///     "/home/will/code/text.log",
+    /// )?;
+    /// client.logout()?;
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// # Errors
     /// Due to connection errors with the server, incorrect filenames or server response.
-    pub fn rename(&mut self, from: String, to: String) -> Result<()> {
-        let response = self.write_cmd(format!("RNFR {}", from))?;
+    pub fn rename(&mut self, from: impl AsRef<str>, to: impl AsRef<str>) -> Result<()> {
+        let response = self.write_cmd(format!("RNFR {}", from.as_ref()))?;
         if response.code != FILE_ACTION_PENDING {
             return Err(FtpError::CommandError(format!(
                 "Could not rename file: {}",
@@ -229,7 +311,7 @@ impl FtpClient {
             )));
         }
 
-        let response = self.write_cmd(format!("RNTO {}", to))?;
+        let response = self.write_cmd(format!("RNTO {}", to.as_ref()))?;
         if response.code != FILE_ACTION_OK {
             return Err(FtpError::CommandError(format!(
                 "Could not rename file: {}",
@@ -249,11 +331,11 @@ impl FtpClient {
     /// # use simpleftp::client::FtpClient;
     /// let mut client = FtpClient::connect("127.0.0.1:21").unwrap();
     /// client.login("user", "password").unwrap();
-    /// client.delete("/home/will/code/log.txt".into()).unwrap();
+    /// client.delete("/home/will/code/log.txt").unwrap();
     /// client.logout().unwrap();
     /// ```
-    pub fn delete(&mut self, file: String) -> Result<()> {
-        let response = self.write_cmd(format!("DELE {}", file))?;
+    pub fn delete(&mut self, file: impl AsRef<str>) -> Result<()> {
+        let response = self.write_cmd(format!("DELE {}", file.as_ref()))?;
         if response.code != FILE_ACTION_OK {
             return Err(FtpError::CommandError(format!(
                 "Could not delete file: {}",
@@ -271,7 +353,7 @@ impl FtpClient {
     pub fn pasv(&mut self) -> Result<TcpStream> {
         let response = self.write_cmd("PASV")?;
         let code = response.code;
-        if code != PASSIVE_MODE {
+        if code != PASSIVE_MODE && code != ALREADY_OPEN {
             return Err(FtpError::ResponseError(format!(
                 "Invalid response code from server: {}",
                 code
@@ -286,15 +368,242 @@ impl FtpClient {
         Ok(connection)
     }
 
+    /// Get a list of files in the directory. Including file information.
+    ///
+    /// # Arguments
+    /// `dir`   directory to git list udner
+    ///
+    /// # Errors
+    /// Errors on connection failure or improper response from server
+    pub fn list(&mut self, dir: &str) -> Result<Vec<String>> {
+        self.list_cmd(dir, false)
+    }
+
+    /// Get a list of files in the directory. Names only.
+    ///
+    /// # Arguments
+    /// `dir`   directory to git list udner
+    ///
+    /// # Errors
+    /// Errors on connection failure or improper response from server
+    pub fn name_list(&mut self, dir: &str) -> Result<Vec<String>> {
+        self.list_cmd(dir, true)
+    }
+
+    /// Get a list of files in the directory. N
+    ///
+    /// # Arguments
+    /// `dir`   directory to git list udner
+    /// `named` if true get only names with no further information
+    /// # Errors
+    /// Errors on connection failure or improper response from server
+    fn list_cmd(&mut self, dir: &str, named: bool) -> Result<Vec<String>> {
+        let datacon = self.pasv()?;
+        let response = if named {
+            self.write_cmd(format!("NLST {}", dir))?
+        } else {
+            self.write_cmd(format!("LIST {}", dir))?
+        };
+        if response.code != COMMAND_OK && response.code != ALREADY_OPEN && response.code != FILE_OK
+        {
+            return Err(FtpError::CommandError(response.message));
+        }
+        let line_reader = BufReader::new(datacon);
+        let file_list = line_reader
+            .lines()
+            .filter(|item| item.is_ok())
+            .map(|item| item.unwrap())
+            .collect();
+
+        #[cfg(feature = "debug")]
+        println!("Closing connection");
+        match self.parse_response()?.code {
+            CLOSING_DATA_CONNECTION => Ok(file_list),
+            _ => Err(FtpError::ConnectionError("Error closing connection".into())),
+        }
+    }
+
+    /// Change working directory on server side.
+    ///
+    /// # Arguments
+    /// `dir`   Directory to be set as current working directory
+    ///
+    /// # Errors
+    /// Errors on connection failure or inexisting directory.
+    pub fn change_dir(&mut self, dir: impl AsRef<str>) -> Result<()> {
+        let response = self.write_cmd(format!("CWD {}", dir.as_ref()))?;
+        match response.code {
+            COMMAND_OK | FILE_ACTION_OK => Ok(()),
+            _other => Err(FtpError::FileError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
+        }
+    }
+
+    /// Create directory on server side.
+    ///
+    /// # Arguments
+    /// `dir`   Director to created
+    pub fn makedir(&mut self, dir: impl AsRef<str>) -> Result<()> {
+        let response = self.write_cmd(format!("MKD {}", dir.as_ref()))?;
+        match response.code {
+            DIRECTORY_ALREADY_EXISTS | PATH_CREATED => Ok(()),
+            _other => Err(FtpError::FileError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
+        }
+    }
+
+    /// Remove directory on server side.
+    ///
+    /// # Arguments
+    /// `dir`   Director to removed
+    pub fn remove_dir(&mut self, dir: impl AsRef<str>) -> Result<()> {
+        let response = self.write_cmd(format!("RMD {}", dir.as_ref()))?;
+        match response.code {
+            FILE_ACTION_OK => Ok(()),
+            _other => Err(FtpError::FileError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
+        }
+    }
+
+    /// Go to parent directory on server side.
+    pub fn change_dir_up(&mut self) -> Result<()> {
+        let response = self.write_cmd("CDUP")?;
+        match response.code {
+            COMMAND_OK | FILE_ACTION_OK => Ok(()),
+            _other => Err(FtpError::CommandError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
+        }
+    }
+
+    /// Print  directory on server side.
+    pub fn pwd(&mut self) -> Result<String> {
+        let response = self.write_cmd("PWD")?;
+        match response.code {
+            PATH_CREATED => Ok(response.message),
+            _other => Err(FtpError::CommandError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
+        }
+    }
+
+    /// Close current data connection
+    pub fn abort(&mut self) -> Result<()> {
+        let response = self.write_cmd("ABOR")?;
+        match response.code {
+            CLOSING_DATA_CONNECTION => Ok(()),
+            _other => Err(FtpError::CommandError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
+        }
+    }
+
+    /// Get status of directory
+    ///
+    /// # Arguments
+    /// `path`  path of item to get status
+    pub fn status(&mut self, path: impl AsRef<str>) -> Result<String> {
+        let response = self.write_cmd(format!("STAT {}", path.as_ref()))?;
+        match response.code {
+            SYSTEM | FILE | DIRECTORY => Ok(response.message),
+            _other => Err(FtpError::CommandError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
+        }
+    }
+
+    // Get server information
+    pub fn system(&mut self) -> Result<String> {
+        let response = self.write_cmd("SYST")?;
+        match response.code {
+            SYSTEM | NAME_SYSTEM => Ok(response.message),
+            _other => Err(FtpError::CommandError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
+        }
+    }
+
+    /// Get help for given item
+    ///
+    /// # Arguments
+    /// `item`  item to retrieve information for
+    ///
+    /// # Examples:
+    /// ```no_run
+    /// # use simpleftp::client::FtpClient;
+    /// let mut client = FtpClient::connect("127.0.0.1:21").unwrap();
+    /// client.login("user", "password").unwrap();
+    /// client.help("SITE").unwrap();
+    /// client.logout().unwrap();
+    /// ```
+    pub fn help(&mut self, item: impl AsRef<str>) -> Result<String> {
+        let response = self.write_cmd(format!("HELP {}", item.as_ref()))?;
+        match response.code {
+            HELP_MESSAGE | FILE => Ok(response.message),
+            _other => Err(FtpError::CommandError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
+        }
+    }
+
+    /// Allocate space for a file transfer
+    ///
+    /// # Arguments
+    /// `size`  path of item to get status
+    pub fn allocate(&mut self, size: usize) -> Result<()> {
+        let response = self.write_cmd(format!("ALLO {}", size))?;
+        match response.code {
+            COMMAND_OK => Ok(()),
+            _other => Err(FtpError::CommandError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
+        }
+    }
+
+    // Mount a different filesystem on the server.
+    ///
+    /// # Arguments
+    /// `pathname`   Path to the device to mount
+    ///
+    /// # Errors
+    /// Errors on connection failure or inexisting pathname.
+    pub fn mount(&mut self, pathname: impl AsRef<str>) -> Result<()> {
+        let response = self.write_cmd(format!("SMNT {}", pathname.as_ref()))?;
+        match response.code {
+            COMMAND_OK | FILE_ACTION_OK => Ok(()),
+            _other => Err(FtpError::FileError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
+        }
+    }
+
     /// Disconnect from the server
     ///
     /// # Errors
     /// On the strange circumstances the server refuses the logout operation
     /// or does not recognize the command.
     pub fn logout(&mut self) -> Result<()> {
-        match self.write_cmd("QUIT")?.code {
+        let response = self.write_cmd("QUIT")?;
+        match response.code {
             SERVICE_CLOSING => Ok(()),
-            other => Err(FtpError::LoginError(format!("Ivalid response {}", other))),
+            _other => Err(FtpError::FileError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
         }
     }
 
@@ -320,7 +629,8 @@ impl FtpClient {
         // multiline response
         if response[0..4].contains('-') {
             let mut new_line = String::new();
-            while !new_line.starts_with(&response[0..4]) {
+            while !new_line.starts_with(&response[0..3]) {
+                new_line.clear();
                 self.reader.read_line(&mut new_line)?;
                 response.push_str(&new_line[..]);
                 #[cfg(feature = "debug")]

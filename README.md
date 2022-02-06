@@ -6,11 +6,11 @@ Non-secure only implement basic functionality.
 - [x] USER
 - [x] PASS
 - [x] ACCT
-- [ ] CWD
-- [ ] CDUP
-- [ ] SMNT
+- [x] CWD
+- [x] CDUP
+- [x] SMNT
 - [x] QUIT
-- [ ] REIN
+- [ ] ~REIN~
 - [ ] ~PORT~ 
 - [x] PASV
 - [ ] TYPE
@@ -18,21 +18,21 @@ Non-secure only implement basic functionality.
 - [ ] MODE
 - [x] RETR
 - [x] STOR
-- [ ] STOU
-- [ ] APPE
-- [ ] ALLO
-- [ ] REST
+- [x] STOU
+- [x] APPE
+- [x] ALLO
+- [ ] ~REST~
 - [x] RNFR
 - [x] RNTO
-- [ ] ABOR
+- [x] ABOR
 - [x] DELE
-- [ ] RMD
-- [ ] MKD
-- [ ] PWD
-- [ ] LIST
-- [ ] NLST
-- [ ] SITE
-- [ ] SYST
-- [ ] STAT
-- [ ] HELP
+- [x] RMD
+- [x] MKD
+- [x] PWD
+- [x] LIST
+- [x] NLST
+- [ ] ~SITE~
+- [x] SYST
+- [x] STAT
+- [x] HELP
 - [x] NOOP
