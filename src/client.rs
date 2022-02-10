@@ -1,3 +1,11 @@
+//!A simple FTP Client implementation.
+//! Offers FTP commands to:
+//! * Login
+//! * Copy files
+//! * Rename files
+//! * Delete files/directories
+//! * List files
+//!
 use super::status::*;
 use super::*;
 use std::io::BufRead;
@@ -8,6 +16,7 @@ use std::net::Shutdown;
 use std::net::TcpStream;
 use std::net::ToSocketAddrs;
 
+/// A FTP Client
 pub struct FtpClient {
     reader: BufReader<TcpStream>,
 }
@@ -100,7 +109,7 @@ impl FtpClient {
     /// account string representing the user account for login
     ///
     /// # Errors
-    /// Errors when fialing to write to server or to parse response.
+    /// Errors when failing to write to server or to parse response.
     pub fn account(&mut self, account: impl AsRef<str>) -> Result<()> {
         match self.write_cmd(format!("ACCT {}", account.as_ref()))?.code {
             LOGGED_IN => Ok(()),
@@ -123,14 +132,14 @@ impl FtpClient {
     ///     client.login("user", "passowrd")?;
     ///
     ///     let mut destination = std::fs::File::open("log.txt").expect("Opening file");
-    ///     client.get("/home/will/code/log.txt".into(), &mut destination)?;
+    ///     client.get("/home/will/code/log.txt", &mut destination)?;
     ///     client.logout()?;
     ///     Ok(())
     /// }
     ///
     /// ```
     /// # Errors
-    /// Errors when fialing to write to server or to parse response or due to connection problems.
+    /// Errors when failing to write to server or to parse response or due to connection problems.
     pub fn get(&mut self, file: impl AsRef<str>, dest: &mut impl Write) -> Result<()> {
         let mut stream = self.pasv()?;
         let response = self.write_cmd(format!("RETR {}", file.as_ref()))?;
@@ -170,7 +179,7 @@ impl FtpClient {
     /// }
     /// ```
     /// # Errors
-    /// Errors when fialing to write to server or to parse response or due to connection problems.
+    /// Errors when failing to write to server or to parse response or due to connection problems.
     /// May also fail when reading from the source stream.
     pub fn put(&mut self, file: impl AsRef<str>, source: &mut impl Read) -> Result<()> {
         self.store_cmd(file, source, false)?;
@@ -202,7 +211,7 @@ impl FtpClient {
     /// }
     /// ```
     /// # Errors
-    /// Errors when fialing to write to server or to parse response or due to connection problems.
+    /// Errors when failing to write to server or to parse response or due to connection problems.
     /// May also fail when reading from the source stream.
     pub fn put_unique(&mut self, source: &mut impl Read) -> Result<String> {
         self.store_cmd("", source, true)
@@ -224,13 +233,13 @@ impl FtpClient {
     ///     client.login("user", "passowrd/").unwrap();
     ///
     ///     let mut source = std::fs::File::create("log.txt").expect("Opening file");
-    ///     client.append(&mut source).unwrap();
+    ///     client.append("/home/will/log.txt/", &mut source).unwrap();
     ///     client.logout().unwrap();
     ///     Ok(())
     /// }
     /// ```
     /// # Errors
-    /// Errors when fialing to write to server or to parse response or due to connection problems.
+    /// Errors when failing to write to server or to parse response or due to connection problems.
     /// May also fail when reading from the source stream.
     pub fn append(&mut self, file: impl AsRef<str>, source: &mut impl Read) -> Result<()> {
         self.store_cmd(file.as_ref(), source, false)?;
@@ -444,7 +453,7 @@ impl FtpClient {
     /// Create directory on server side.
     ///
     /// # Arguments
-    /// `dir`   Director to created
+    /// `dir`   directoryto created
     pub fn makedir(&mut self, dir: impl AsRef<str>) -> Result<()> {
         let response = self.write_cmd(format!("MKD {}", dir.as_ref()))?;
         match response.code {
@@ -459,7 +468,7 @@ impl FtpClient {
     /// Remove directory on server side.
     ///
     /// # Arguments
-    /// `dir`   Director to removed
+    /// `dir`   directoryto removed
     pub fn remove_dir(&mut self, dir: impl AsRef<str>) -> Result<()> {
         let response = self.write_cmd(format!("RMD {}", dir.as_ref()))?;
         match response.code {
@@ -522,7 +531,7 @@ impl FtpClient {
         }
     }
 
-    // Get server information
+    /// Get server information
     pub fn system(&mut self) -> Result<String> {
         let response = self.write_cmd("SYST")?;
         match response.code {

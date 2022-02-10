@@ -1,7 +1,31 @@
+//! [crate] A simple and naive implementation of the FTP protocol.
+//! This library doesn't support all FTP commands. See [README.md].
+//! This library doesn't provide encripted data transmission.
+//! # Example:
+//! ```no_run
+//! use simpleftp::client::FtpClient;
+//! use simpleftp::Result;
+//!
+//! fn main() -> Result<()> {
+//!     // connect to server
+//!     let mut client = FtpClient::connect("test.rebex.net:21")?;
+//!     client.login("demo", "password")?;
+//!
+//!     // download file
+//!     let mut readme = std::fs::File::create("readme.txt")?;
+//!     client.get("/readme.txt", &mut readme)?;
+//!
+//!     // disconnect from server
+//!     client.logout()?;
+//!     Ok(())
+//! }
+//!```
+
 use std::io::ErrorKind;
 #[allow(dead_code)]
 pub mod client;
 
+/// A generic FTP representation enum
 #[derive(Debug, Clone)]
 pub enum FtpError {
     LoginError(String),
@@ -38,8 +62,11 @@ impl std::fmt::Display for FtpError {
         }
     }
 }
+/// Generic Result type defaults to Result<T, FtpError>
 pub type Result<T> = std::result::Result<T, FtpError>;
 
+#[doc(hidden)]
+/// FTP Response Implementation
 #[allow(dead_code)]
 pub(crate) struct Response {
     code: usize,
