@@ -131,10 +131,10 @@ impl FtpClient {
     /// ```
     /// # Errors
     /// Errors when fialing to write to server or to parse response or due to connection problems.
-    pub fn get(&mut self, file: String, dest: &mut impl Write) -> Result<()> {
+    pub fn get(&mut self, file: impl AsRef<str>, dest: &mut impl Write) -> Result<()> {
         let mut stream = self.pasv()?;
-        let response = self.write_cmd(format!("RETR {}", file))?;
-        if response.code != FILE_OK {
+        let response = self.write_cmd(format!("RETR {}", file.as_ref()))?;
+        if response.code != FILE_OK && response.code != ALREADY_OPEN {
             return Err(FtpError::CommandError(
                 "Could not process file retrieve".into(),
             ));
@@ -253,7 +253,7 @@ impl FtpClient {
             return Err(FtpError::CommandError("Could not process file STOR".into()));
         }
         #[cfg(feature = "debug")]
-        println!("Copying file:{}", file);
+        println!("Copying file:{}", file.as_ref());
 
         std::io::copy(source, &mut stream)?;
 

@@ -1,7 +1,27 @@
 # simpleftp
-Naive toy FTP Client 
-Non-secure only implement basic functionality.
+Naive toy FTP Client  </br>
+Non-encrypted only implement basic functionality.
 
+## Example
+```
+use simpleftp::client::FtpClient;
+use simpleftp::Result;
+
+fn main() -> Result<()> {
+    // connect to server
+    let mut client = FtpClient::connect("test.rebex.net:21")?;
+    client.login("demo", "password")?;
+
+    // download file
+    let mut readme = std::fs::File::create("readme.txt")?;
+    client.get("/readme.txt", &mut readme)?;
+
+    // disconnect from server
+    client.logout()?;
+    Ok(())
+}
+
+```
 ## Supported:
 - [x] USER
 - [x] PASS
