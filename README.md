@@ -3,7 +3,7 @@ Naive toy FTP Client  </br>
 Non-encrypted only implement basic functionality.
 
 ## Example
-```
+``` rs
 use simpleftp::client::FtpClient;
 use simpleftp::Result;
 
