@@ -710,7 +710,7 @@ impl FtpClient {
         }
     }
 
-    // Mount a different filesystem on the server.
+    /// Mount a different filesystem on the server.
     ///
     /// # Arguments
     /// `pathname`   Path to the device to mount
@@ -744,7 +744,35 @@ impl FtpClient {
         }
     }
 
-    /// reads a response and returns the server's response
+    /// Set transfer mode to binary.
+    /// # Errors
+    /// On connection failure or when type not suported by server
+    pub fn binary_mode(&mut self) -> Result<()> {
+        let response = self.write_cmd("TYPE I")?;
+        match response.code {
+            COMMAND_OK => Ok(()),
+            _other => Err(FtpError::FileError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
+        }
+    }
+
+    /// Set transfer mode to ASCII.
+    /// # Errors
+    /// On connection failure or when type not suported by server
+    pub fn ascii_mode(&mut self) -> Result<()> {
+        let response = self.write_cmd("TYPE A")?;
+        match response.code {
+            COMMAND_OK => Ok(()),
+            _other => Err(FtpError::FileError(format!(
+                "Invalid response {}",
+                response.message
+            ))),
+        }
+    }
+
+    /// Reads a response and returns the server's response
     fn parse_response(&mut self) -> Result<Response> {
         let mut response = String::new();
         self.reader
