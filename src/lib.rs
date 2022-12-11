@@ -811,21 +811,23 @@ impl FtpClient {
 
     // Helper method to extract the TCP connection address common on PASV and PORT responses
     fn extract_pasv_address(response: &str) -> Result<String> {
-        let re = regex::Regex::new(r"(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3})")
-            .unwrap();
+        let ipinfo = response.chars().filter(|c| *c==',' || c.is_numeric()).collect::<String>();
+        let tokens = ipinfo.split(",").map(|tok| tok.trim().to_string()).collect::<Vec<String>>();
+        let numbers = tokens.iter().filter(|tok| tok.parse::<u32>().is_ok()).map(|tok| tok.parse::<u32>().unwrap()).collect::<Vec<u32>>();
+
         let format_error =
             FtpError::ResponseError(format!("Invalid PASV response from server: {}", response));
-        let ipgroup = re.captures(response).ok_or_else(|| format_error.clone())?;
-        if ipgroup.len() < 6 {
+
+        if numbers.len() < 6 {
             Err(format_error.clone())
         } else {
-            let port_lower: u32 = ipgroup[6].parse().unwrap();
-            let port_upper: u32 = ipgroup[5].parse().unwrap();
+            let port_lower: u32 = numbers[5];
+            let port_upper: u32 = numbers[4];
 
             let full_port = port_upper * 256 + port_lower;
             Ok(format!(
                 "{}.{}.{}.{}:{}",
-                &ipgroup[1], &ipgroup[2], &ipgroup[3], &ipgroup[4], full_port
+                &numbers[0], &numbers[1], &numbers[2], &numbers[3], full_port
             ))
         }
     }
