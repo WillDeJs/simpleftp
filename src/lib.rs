@@ -698,7 +698,7 @@ impl FtpClient {
     /// Allocate space for a file transfer
     ///
     /// # Arguments
-    /// `size`  path of item to get status
+    /// `size`  byute size to be allocated
     pub fn allocate(&mut self, size: usize) -> Result<()> {
         let response = self.write_cmd(format!("ALLO {}", size))?;
         match response.code {
@@ -811,9 +811,18 @@ impl FtpClient {
 
     // Helper method to extract the TCP connection address common on PASV and PORT responses
     fn extract_pasv_address(response: &str) -> Result<String> {
-        let ipinfo = response.chars().filter(|c| *c==',' || c.is_numeric()).collect::<String>();
-        let tokens = ipinfo.split(",").map(|tok| tok.trim().to_string()).collect::<Vec<String>>();
-        let numbers = tokens.iter().filter(|tok| tok.parse::<u32>().is_ok()).map(|tok| tok.parse::<u32>().unwrap()).collect::<Vec<u32>>();
+        let ipinfo = response
+            .chars()
+            .filter(|c| *c == ',' || c.is_numeric())
+            .collect::<String>();
+        let tokens = ipinfo
+            .split(',')
+            .map(|tok| tok.trim().to_string())
+            .collect::<Vec<String>>();
+        let numbers = tokens
+            .iter()
+            .filter_map(|tok| tok.parse::<u32>().ok())
+            .collect::<Vec<u32>>();
 
         let format_error =
             FtpError::ResponseError(format!("Invalid PASV response from server: {}", response));
